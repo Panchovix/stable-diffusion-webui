@@ -168,11 +168,17 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
         for line in lines:
             fnt = initial_fnt
             fontsize = initial_fontsize
-            while drawing.multiline_textsize(line.text, font=fnt)[0] > line.allowed_width and fontsize > 0:
+            # Get the bounding box of the text
+            text_width, text_height = drawing.multiline_textbbox((0, 0), line.text, font=fnt)[2:]
+            while text_width > line.allowed_width and fontsize > 0:
                 fontsize -= 1
-                fnt = get_font(fontsize)
+                fnt = get_font(fontsize)  # Ensure get_font is defined to return a font object
+                text_width, text_height = drawing.multiline_textbbox((0, 0), line.text, font=fnt)[2:]
+
+            # Draw the text centered
             drawing.multiline_text((draw_x, draw_y + line.size[1] / 2), line.text, font=fnt, fill=color_active if line.is_active else color_inactive, anchor="mm", align="center")
 
+            # If line is inactive, draw a line through it
             if not line.is_active:
                 drawing.line((draw_x - line.size[0] // 2, draw_y + line.size[1] // 2, draw_x + line.size[0] // 2, draw_y + line.size[1] // 2), fill=color_inactive, width=4)
 
