@@ -138,6 +138,26 @@ def ddim_cfgpp(n, sigma_min, sigma_max, inner_model, device):
     
     return sigmas.to(device)
 
+def vp(n, sigma_min, sigma_max, inner_model, device):
+    beta_d = shared.opts.data.get("vp_beta_d", 19.9)
+    beta_min = shared.opts.data.get("vp_beta_min", 0.1)
+    eps_s = shared.opts.data.get("vp_eps_s", 0.001)
+    
+    t = torch.linspace(1, 0, n + 1, device=device)[:-1]
+    
+    def alpha_bar(t):
+        return torch.cos(t * torch.pi / 2) ** 2
+    
+    def sigma(t):
+        return torch.sqrt(torch.sin(t * torch.pi / 2) ** 2 * beta_d)
+    
+    alphas = alpha_bar(t)
+    sigmas = sigma(t)
+    
+    sigmas = torch.cat([sigmas, sigmas.new_zeros([1])])
+    
+    return sigmas.to(device)
+
 
 schedulers = [
     Scheduler('automatic', 'Automatic', None),
@@ -152,6 +172,7 @@ schedulers = [
     Scheduler('normal', 'Normal', normal_scheduler, need_inner_model=True),
     Scheduler('ddim', 'DDIM', ddim_scheduler, need_inner_model=True),
     Scheduler('ddim_cfgpp', 'CFG++', ddim_cfgpp, need_inner_model=True),
+    Scheduler('vp', 'Variance Preserving', vp, need_inner_model=True),
 ]
 
 schedulers_map = {**{x.name: x for x in schedulers}, **{x.label: x for x in schedulers}}
