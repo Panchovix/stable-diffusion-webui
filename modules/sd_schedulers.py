@@ -158,6 +158,25 @@ def vp(n, sigma_min, sigma_max, inner_model, device):
     
     return sigmas.to(device)
 
+def sdturbo(n, sigma_min, sigma_max, inner_model, device):
+    denoise = shared.opts.data.get("sdturbo_denoise", 1.0)
+    
+    # Ensure at least one step
+    n = max(1, n)
+    
+    t_max = inner_model.sigma_to_t(torch.tensor(sigma_max))
+    t_min = inner_model.sigma_to_t(torch.tensor(sigma_min))
+    
+    timesteps = torch.linspace(t_max, t_min, n, device=device)
+    sigmas = inner_model.t_to_sigma(timesteps)
+    
+    # Ensure we have at least one sigma value
+    if len(sigmas) == 0:
+        sigmas = torch.tensor([sigma_max, sigma_min], device=device)
+    
+    sigmas = torch.cat([sigmas, sigmas.new_zeros([1])])
+    return sigmas.to(device)
+
 
 schedulers = [
     Scheduler('automatic', 'Automatic', None),
@@ -173,6 +192,7 @@ schedulers = [
     Scheduler('ddim', 'DDIM', ddim_scheduler, need_inner_model=True),
     Scheduler('ddim_cfgpp', 'CFG++', ddim_cfgpp, need_inner_model=True),
     Scheduler('vp', 'Variance Preserving', vp, need_inner_model=True),
+    Scheduler('sdturbo', 'SD Turbo', sdturbo, need_inner_model=True),
 ]
 
 schedulers_map = {**{x.name: x for x in schedulers}, **{x.label: x for x in schedulers}}
