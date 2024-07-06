@@ -114,6 +114,30 @@ def ddim_scheduler(n, sigma_min, sigma_max, inner_model, device):
     sigs += [0.0]
     return torch.FloatTensor(sigs).to(device)
 
+def ddim_cfgpp(n, sigma_min, sigma_max, inner_model, device):
+    if hasattr(inner_model, 'alphas_cumprod'):
+        # For timestep-based samplers
+        alphas_cumprod = inner_model.alphas_cumprod
+    elif hasattr(inner_model, 'inner_model'):
+        # For k-diffusion samplers
+        alphas_cumprod = inner_model.inner_model.alphas_cumprod
+    else:
+        raise AttributeError("Cannot find alphas_cumprod in the model")
+
+    timesteps = torch.linspace(0, 999, n, device=device).long()
+    alphas = alphas_cumprod[timesteps]
+    alphas_prev = alphas_cumprod[torch.nn.functional.pad(timesteps[:-1], pad=(1, 0))]
+    sqrt_one_minus_alphas = torch.sqrt(1 - alphas)
+    sigmas = sqrt_one_minus_alphas / torch.sqrt(alphas)
+    
+    # Ensure sigmas are in descending order
+    sigmas = torch.flip(sigmas, [0])
+    
+    # Add a final sigma of 0 for the last step
+    sigmas = torch.cat([sigmas, sigmas.new_zeros([1])])
+    
+    return sigmas.to(device)
+
 
 schedulers = [
     Scheduler('automatic', 'Automatic', None),
@@ -127,6 +151,7 @@ schedulers = [
     Scheduler('simple', 'Simple', simple_scheduler, need_inner_model=True),
     Scheduler('normal', 'Normal', normal_scheduler, need_inner_model=True),
     Scheduler('ddim', 'DDIM', ddim_scheduler, need_inner_model=True),
+    Scheduler('ddim_cfgpp', 'CFG++', ddim_cfgpp, need_inner_model=True),
 ]
 
 schedulers_map = {**{x.name: x for x in schedulers}, **{x.label: x for x in schedulers}}
